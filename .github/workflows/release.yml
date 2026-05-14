@@ -1,0 +1,49 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags like v1.0, v1.1, etc.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Get Version from Manifest
+        id: get_version
+        run: |
+          VERSION=$(grep '"version":' manifest.json | cut -d'"' -f4)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
+      - name: Package Extension
+        run: |
+          # Create a zip file of the extension
+          # Excluding hidden files, git, and github actions
+          zip -r ai-chat-exporter-v${{ steps.get_version.outputs.VERSION }}.zip . -x "*.git*" "*.github*" "README.md" ".gitignore"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ai-chat-exporter-v${{ steps.get_version.outputs.VERSION }}.zip
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## 🚀 AI Chat Exporter v${{ steps.get_version.outputs.VERSION }}
+            
+            ### 📦 Extension Package
+            Download the `ai-chat-exporter-v${{ steps.get_version.outputs.VERSION }}.zip` below and load it as an unpacked extension in Chrome.
+            
+            ### 🛠️ Key Updates
+            - Auto-detection for Gemini, ChatGPT, and Claude.
+            - Deep-scroll history extraction.
+            - Modular project structure.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

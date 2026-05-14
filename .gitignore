@@ -1,0 +1,20 @@
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Extension local files
+*.zip
+*.crx
+*.pem
+*.md
+!README.md
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project local
+node_modules/
+package-lock.json

@@ -1,0 +1,226 @@
+:root {
+  --neon-cyan: #0ff;
+  --neon-pink: #f0f;
+  --neon-purple: #9d00ff;
+  --bg-dark: #020205;
+  --glass-bg: rgba(15, 15, 25, 0.7);
+  --glass-border: rgba(0, 255, 255, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body {
+  width: 320px;
+  height: 480px;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-dark);
+  color: white;
+  font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* --- Animated Mesh Gradient Background --- */
+.bg-gradient {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #020205 100%);
+  z-index: -2;
+}
+
+.bg-blobs {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  overflow: hidden;
+  z-index: -1;
+  filter: blur(80px);
+  opacity: 0.5;
+}
+
+.blob {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: var(--neon-purple);
+  animation: move 20s infinite alternate;
+}
+
+.blob.one { top: -50px; left: -50px; background: var(--neon-cyan); animation-duration: 15s; }
+.blob.two { bottom: -50px; right: -50px; background: var(--neon-pink); animation-duration: 18s; }
+
+@keyframes move {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(100px, 150px) scale(1.2); }
+}
+
+/* --- Main Container --- */
+.container {
+  flex: 1;
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  backdrop-filter: blur(10px);
+  z-index: 1;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+h3 {
+  margin: 0;
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  color: white;
+  text-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+.version {
+  font-size: 10px;
+  color: var(--neon-cyan);
+  letter-spacing: 2px;
+  margin-top: 5px;
+  display: block;
+}
+
+/* --- Detection Scanner Box --- */
+#detection-status {
+  position: relative;
+  height: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#detection-status::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 2px;
+  background: var(--neon-cyan);
+  box-shadow: 0 0 15px var(--neon-cyan);
+  animation: scan 3s linear infinite;
+}
+
+@keyframes scan {
+  0% { top: 0; opacity: 0; }
+  5% { opacity: 1; }
+  95% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+#detection-status.detected {
+  border-color: var(--neon-cyan);
+  box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.1);
+}
+
+#detection-status.not-detected {
+  border-color: rgba(255, 0, 0, 0.2);
+  filter: grayscale(1);
+}
+
+.status-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0.6;
+  margin-bottom: 5px;
+}
+
+.status-value {
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* --- Export Button Section --- */
+.action-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+button {
+  position: relative;
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 16px;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+button::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--neon-pink);
+  box-shadow: 0 0 20px rgba(240, 0, 240, 0.3);
+  background: rgba(240, 0, 240, 0.05);
+}
+
+button:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+#exportBtn.detected-active {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+  text-shadow: 0 0 5px var(--neon-pink);
+}
+
+/* --- Footer Log --- */
+#status {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #888;
+  padding: 10px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#status.error {
+  color: var(--neon-pink);
+}

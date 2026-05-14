@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Background Effects -->
+  <div class="bg-gradient"></div>
+  <div class="bg-blobs">
+    <div class="blob one"></div>
+    <div class="blob two"></div>
+  </div>
+
+  <div class="container">
+    <header>
+      <h3>Neural Extractor</h3>
+      <span class="version">v1.1 [STABLE]</span>
+    </header>
+
+    <div id="detection-status" class="not-detected">
+      <span class="status-label">Signal Status</span>
+      <span class="status-value" id="detected-ai-name">Initializing...</span>
+    </div>
+
+    <div class="action-zone">
+      <button id="exportBtn" disabled>Extract Data Stream</button>
+      <div id="status">System Ready...</div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
