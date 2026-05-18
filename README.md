@@ -18,8 +18,21 @@ A high-performance Chrome Extension designed to archive your AI chatbot conversa
 ## 🚀 Supported Platforms
 
 - **Gemini (Fully Implemented):** Deep-scroll, Thinking blocks, and complete history extraction.
+- **Z AI (Fully Implemented):** Obsidian-native callouts for thinking processes, intelligent URL harvesting for citations, and interactive user prompts for sidebars.
 - **ChatGPT (Support Pending):** URL detection active.
 - **Claude (Support Pending):** URL detection active.
+
+## 🧠 Implementation Procedures
+
+### Google Gemini (`extract_gemini`)
+- **Deep-Scroll Protocol:** Gemini lazy-loads older messages. The script bypasses this by calculating document scroll height and iteratively scrolling to the top, waiting for network loads to settle until no new height is generated.
+- **Thinking Block Expansion:** Gemini 2.0 reasoning blocks are hidden under `<details>` tags. The script locates all `.model-thought-process` tags, forces them to open via `.setAttribute('open', '')`, and extracts the nested reasoning text.
+- **Metadata Scrubbing:** User avatars and generic AI avatars are stripped using complex CSS query selectors to keep the final markdown pristine.
+
+### Z AI (`extract_zai`)
+- **Obsidian Native Callouts:** Z AI generates thoughts in split `.thinking-block` divs that are hidden using `h-0` classes. The extension compiles these discrete HTML blocks and injects them into an Obsidian-native markdown callout (`> [!quote]- 🧠 **Model Thinking**`).
+- **Base64 SVG Cleansing:** Z AI heavily pollutes the DOM with massive inline base64 SVGs for structural icons and citation pills. A custom Turndown rule intercepts all `<img>` tags, checks the `src` attribute for `data:image/svg+xml`, and forcefully strips them, reducing file size by 90%.
+- **Interactive URL Harvesting:** References are stored dynamically. The extension detects if the chat is in "search mode" by scanning the response for source buttons or inline citations (`button.group/citations`). If it detects sources exist but the right-hand sidebar is closed, it gracefully aborts the export, triggers a native browser alert, and displays a warning to the user on the extension popup. This prompts the user to manually open the sidebar to ensure 100% data fidelity of reference URLs.
 
 ## 📂 Project Structure
 

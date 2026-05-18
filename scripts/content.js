@@ -42,6 +42,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         payload: chatData,
         title: chatTitle 
       });
+    }).catch(err => {
+      console.error(err);
+      if (err.message === "USER_PROMPT_NEEDED") {
+        sendResponse({ status: "prompt_needed", message: "Please open the References/Sources sidebar before exporting!" });
+      } else {
+        sendResponse({ status: "error" });
+      }
     });
     return true; 
   }
@@ -197,8 +204,9 @@ async function runZaiExtractor() {
   const thinkingBtns = document.querySelectorAll('.thinking-chain-container button');
   let clicked = 0;
   thinkingBtns.forEach(btn => {
-      const container = btn.closest('.thinking-chain-container').querySelector('.overflow-hidden');
-      // If it has h-0 class, it is collapsed
+      const parent = btn.closest('.thinking-chain-container');
+      const container = parent ? parent.nextElementSibling : null;
+      // If the sibling has h-0 class, it is collapsed
       if (container && container.classList.contains('h-0')) {
           btn.click();
           clicked++;
@@ -224,6 +232,20 @@ async function runZaiExtractor() {
         return '\n\n' + node.outerHTML + '\n\n';
       }
       return ''; // Strip tiny UI icons
+    }
+  });
+
+  // Z AI embeds tiny base64 SVGs in IMG tags for sources, which pollutes the markdown
+  turndownService.addRule('base64-svgs', {
+    filter: 'img',
+    replacement: function(content, node) {
+      const src = node.getAttribute('src') || '';
+      if (src.startsWith('data:image/svg+xml')) {
+        return ''; // Strip base64 SVG icons
+      }
+      // Otherwise, fallback to standard image formatting
+      const alt = node.getAttribute('alt') || '';
+      return src ? `![${alt}](${src})` : '';
     }
   });
 
@@ -268,11 +290,21 @@ async function runZaiExtractor() {
       let sourcesMarkdown = "";
 
       // A. Extract "Thinking" (Reasoning)
-      const thoughtsBlock = node.querySelector('.thinking-chain-container');
-      if (thoughtsBlock) {
-        const contentDiv = thoughtsBlock.querySelector('.thinking-block');
-        if (contentDiv) {
-          thinkingMarkdown = turndownService.turndown(contentDiv.innerHTML);
+      const thoughtsHeader = node.querySelector('.thinking-chain-container');
+      if (thoughtsHeader && thoughtsHeader.nextElementSibling) {
+        const thoughtsContainer = thoughtsHeader.nextElementSibling;
+        const contentDivs = thoughtsContainer.querySelectorAll('.thinking-block');
+        if (contentDivs.length > 0) {
+          let combinedHTML = "";
+          contentDivs.forEach(div => combinedHTML += div.innerHTML + "<br>");
+          const rawThinking = turndownService.turndown(combinedHTML);
+          
+          if (rawThinking) {
+             // Strip existing blockquote markers and wrap in Obsidian callout
+             const cleanText = rawThinking.replace(/^>\s*/gm, '');
+             const calloutText = cleanText.split('\n').map(line => `> ${line}`).join('\n');
+             thinkingMarkdown = `> [!quote]- 🧠 **Model Thinking**\n${calloutText}\n\n`;
+          }
         }
       }
 
@@ -280,29 +312,52 @@ async function runZaiExtractor() {
       const responseContainer = node.querySelector('#response-content-container') || node;
       
       const clone = responseContainer.cloneNode(true);
-      const cloneThoughts = clone.querySelector('.thinking-chain-container');
-      if (cloneThoughts) cloneThoughts.remove();
+      const cloneThoughtsHeader = clone.querySelector('.thinking-chain-container');
+      if (cloneThoughtsHeader) {
+         const cloneThoughtsContainer = cloneThoughtsHeader.nextElementSibling;
+         cloneThoughtsHeader.remove();
+         if (cloneThoughtsContainer && cloneThoughtsContainer.classList.contains('overflow-hidden')) {
+             cloneThoughtsContainer.remove();
+         }
+      }
       
       mainResponseMarkdown = turndownService.turndown(clone.innerHTML);
 
       // C. Extract Sources Pill & URLs
-      // Z AI doesn't store URLs in the inline citations. We must click the pill to open the sidebar.
-      const sourcesList = node.querySelector('button[id^="bits-c"]');
-      if (sourcesList && sourcesList.innerText.includes("Search")) {
-        sourcesMarkdown = "\n\n**Sources Referenced:**\n*" + sourcesList.innerText.replace(/[\n\r]/g, ' ').trim() + "*\n";
-        
-        // Force click to populate the right-hand sidebar with this message's specific URLs
-        sourcesList.click();
-        await new Promise(r => setTimeout(r, 1000)); // Wait for sidebar to render
-        
-        const sidebarLinks = document.querySelectorAll('.searchResultContent a');
-        if (sidebarLinks.length > 0) {
-           sidebarLinks.forEach((a, index) => {
-               // Clean up the text, Z AI sometimes puts titles and URLs inside the a tag
-               const linkText = a.innerText.replace(/\n/g, ' - ').trim() || a.href;
-               sourcesMarkdown += `\n${index + 1}. [${linkText}](${a.href})`;
-           });
-        }
+      // Detect if there are sources by looking for the "Search X keywords" pills, inline citations, or the "Sources" button.
+      const searchPills = Array.from(node.querySelectorAll('*')).filter(el => el.innerText && el.innerText.includes("Search") && el.innerText.includes("reference"));
+      const sourceButtons = Array.from(node.querySelectorAll('button')).filter(b => 
+          (b.innerText && b.innerText.includes("Sources")) || 
+          (b.getAttribute('aria-label') && b.getAttribute('aria-label').includes("Sources"))
+      );
+      const inlineCitations = Array.from(node.querySelectorAll('button.group\\/citations, button[data-tooltip-trigger]')).filter(b => b.querySelector('img'));
+      
+      const hasSources = searchPills.length > 0 || sourceButtons.length > 0 || inlineCitations.length > 0;
+      
+      if (hasSources) {
+          // The response has sources, check if the sidebar is open!
+          const externalLinks = Array.from(document.querySelectorAll('a[href^="http"]'))
+              .filter(a => !node.contains(a) && !a.href.includes('z.ai') && !a.closest('.thinking-chain-container'));
+              
+          if (externalLinks.length === 0) {
+              // Sidebar is not open! Let's abort and ask the user to open it.
+              alert("⚠️ Neural Extractor Alert ⚠️\n\nThis Z AI response contains sources/references.\nPlease manually click the 'Sources' or citation button to open the right-hand sidebar, then click Export again to capture the URLs.");
+              throw new Error("USER_PROMPT_NEEDED");
+          } else {
+              sourcesMarkdown = "\n\n**Sources Referenced:**\n";
+              
+              // De-duplicate URLs
+              const uniqueUrls = new Set();
+              let linkIndex = 1;
+              externalLinks.forEach(link => {
+                  if (link.href && !uniqueUrls.has(link.href)) {
+                      uniqueUrls.add(link.href);
+                      const title = link.innerText ? link.innerText.replace(/\n/g, ' ').trim() : link.href;
+                      sourcesMarkdown += `${linkIndex}. [${title || link.href}](${link.href})\n`;
+                      linkIndex++;
+                  }
+              });
+          }
       }
 
       // D. Final Compilation

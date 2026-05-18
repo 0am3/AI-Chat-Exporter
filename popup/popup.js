@@ -123,14 +123,20 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
         } else if (response && response.status === "unsupported") {
           statusDiv.innerText = ">> ERR: Target not recognized.";
           statusDiv.classList.add('error');
+        } else if (response && response.status === "prompt_needed") {
+          // Display the prompt message on the extension window
+          statusDiv.innerText = ">> " + (response.message || "Please perform manual action.");
+          statusDiv.style.color = "#ff9800"; // Warning color
         } else {
           statusDiv.innerText = ">> ERR: Extraction failed.";
           statusDiv.classList.add('error');
         }
 
-        // Reset button
-        btn.style.pointerEvents = 'auto';
-        btn.style.opacity = '1';
+        // Reset button unless it's a success that we're keeping green
+        if (!response || response.status !== "success") {
+           btn.style.pointerEvents = 'auto';
+           btn.style.opacity = '1';
+        }
       }
     );
   } catch (err) {
