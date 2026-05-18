@@ -20,6 +20,8 @@ async function checkDetection() {
       detectedAI = "ChatGPT";
     } else if (url.includes("claude.ai")) {
       detectedAI = "Claude";
+    } else if (url.includes("chat.z.ai")) {
+      detectedAI = "Z_AI";
     }
 
     updateDetectionUI(detectedAI);
@@ -89,6 +91,7 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
           if (tab.url.includes("gemini")) aiName = "Gemini";
           else if (tab.url.includes("chatgpt")) aiName = "ChatGPT";
           else if (tab.url.includes("claude")) aiName = "Claude";
+          else if (tab.url.includes("chat.z.ai")) aiName = "Z_AI";
 
           // Sanitize the title for filename
           // Replace spaces/special chars with hyphens, collapse multiple hyphens

@@ -23,6 +23,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     });
     return true; 
+  } else if (request.action === "extract_zai") {
+    console.log(">> Initiating Z AI Extraction Protocol...");
+    
+    let chatTitle = document.title;
+    const titleEl = document.querySelector('div[dir="auto"].truncate') || document.querySelector('div[title]');
+    if (titleEl && titleEl.innerText) {
+        chatTitle = titleEl.innerText.trim();
+    }
+    if (!chatTitle || chatTitle === "Z AI" || chatTitle.includes("Z-ai")) {
+      chatTitle = "Untitled Chat";
+    }
+
+    runZaiExtractor().then(chatData => {
+      console.log(">> Z AI Extraction complete.");
+      sendResponse({ 
+        status: "success", 
+        payload: chatData,
+        title: chatTitle 
+      });
+    });
+    return true; 
   }
 });
 
@@ -88,7 +109,8 @@ async function runGeminiExtractor() {
       fullMarkdownLog += `### 🤖 **Gemini**\n\n`;
       
       if (thinkingMarkdown.trim()) {
-         fullMarkdownLog += `<details>\n<summary>🧠 <i>Expand Model Thinking</i></summary>\n\n${thinkingMarkdown.trim()}\n\n</details>\n\n`;
+         const indentedThinking = thinkingMarkdown.trim().split('\n').map(line => `> ${line}`).join('\n');
+         fullMarkdownLog += `> [!quote]- 🧠 **Model Thinking**\n${indentedThinking}\n\n`;
       }
       
       if (mainResponseMarkdown.trim()) {
@@ -159,4 +181,150 @@ async function forceLoadHistory() {
   }
   
   await new Promise(r => setTimeout(r, 1000)); 
-}
+}
+
+// ==============================================================================
+// Z AI EXTRACTION ENGINE
+// ==============================================================================
+
+async function runZaiExtractor() {
+  console.log(">> Initiating Neural Extraction: Z AI Mode...");
+  
+  // Z AI doesn't have a deep scroll protocol yet, but scroll to top to trigger any lazy loading
+  window.scrollTo(0, 0);
+  
+  // 1. Expand all reasoning pathways
+  const thinkingBtns = document.querySelectorAll('.thinking-chain-container button');
+  let clicked = 0;
+  thinkingBtns.forEach(btn => {
+      const container = btn.closest('.thinking-chain-container').querySelector('.overflow-hidden');
+      // If it has h-0 class, it is collapsed
+      if (container && container.classList.contains('h-0')) {
+          btn.click();
+          clicked++;
+      }
+  });
+
+  if (clicked > 0) {
+      console.log(`>> Expanded ${clicked} reasoning blocks. Waiting for render...`);
+      await new Promise(r => setTimeout(r, 1500));
+  }
+
+  const turndownService = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced'
+  });
+
+  // Preserve SVG graphical components (like charts) but remove messy base64 UI icons
+  turndownService.addRule('svg', {
+    filter: 'svg',
+    replacement: function (content, node) {
+      // Check if it's a large structural SVG like mermaid or chart, else strip it to keep MD clean
+      if (node.classList.contains('mermaid') || node.id.includes('mermaid') || (node.getAttribute('width') && parseInt(node.getAttribute('width')) > 100)) {
+        return '\n\n' + node.outerHTML + '\n\n';
+      }
+      return ''; // Strip tiny UI icons
+    }
+  });
+
+  // Handle inline citations and ensure URLs are extracted
+  turndownService.addRule('citations', {
+    filter: function (node) {
+      return node.classList && (node.classList.contains('group/citations') || node.classList.contains('citation'));
+    },
+    replacement: function (content, node) {
+      let url = node.href || "";
+      if (!url) {
+         const aTag = node.querySelector('a');
+         if (aTag) url = aTag.href;
+      }
+      const text = node.innerText.trim();
+      if (url) {
+        return ` [[${text}]](${url}) `;
+      }
+      return ` [${text}] `;
+    }
+  });
+
+  let fullMarkdownLog = "# Neural Extraction: Z AI\n\n";
+  const dateStr = new Date().toLocaleString();
+  fullMarkdownLog += `*Extracted on: ${dateStr}*\n\n---\n\n`;
+
+  // Process every neural node
+  const messageNodes = document.querySelectorAll('.chat-user, .chat-assistant');
+
+  for (const node of messageNodes) {
+    
+    // --- USER NODE ---
+    if (node.classList.contains('chat-user')) {
+      const contentText = node.innerText;
+      fullMarkdownLog += `### 🧑‍💻 **User**\n\n${contentText.trim()}\n\n`;
+    } 
+    
+    // --- MODEL NODE ---
+    else if (node.classList.contains('chat-assistant')) {
+      let thinkingMarkdown = "";
+      let mainResponseMarkdown = "";
+      let sourcesMarkdown = "";
+
+      // A. Extract "Thinking" (Reasoning)
+      const thoughtsBlock = node.querySelector('.thinking-chain-container');
+      if (thoughtsBlock) {
+        const contentDiv = thoughtsBlock.querySelector('.thinking-block');
+        if (contentDiv) {
+          thinkingMarkdown = turndownService.turndown(contentDiv.innerHTML);
+        }
+      }
+
+      // B. Extract Main Response
+      const responseContainer = node.querySelector('#response-content-container') || node;
+      
+      const clone = responseContainer.cloneNode(true);
+      const cloneThoughts = clone.querySelector('.thinking-chain-container');
+      if (cloneThoughts) cloneThoughts.remove();
+      
+      mainResponseMarkdown = turndownService.turndown(clone.innerHTML);
+
+      // C. Extract Sources Pill & URLs
+      // Z AI doesn't store URLs in the inline citations. We must click the pill to open the sidebar.
+      const sourcesList = node.querySelector('button[id^="bits-c"]');
+      if (sourcesList && sourcesList.innerText.includes("Search")) {
+        sourcesMarkdown = "\n\n**Sources Referenced:**\n*" + sourcesList.innerText.replace(/[\n\r]/g, ' ').trim() + "*\n";
+        
+        // Force click to populate the right-hand sidebar with this message's specific URLs
+        sourcesList.click();
+        await new Promise(r => setTimeout(r, 1000)); // Wait for sidebar to render
+        
+        const sidebarLinks = document.querySelectorAll('.searchResultContent a');
+        if (sidebarLinks.length > 0) {
+           sidebarLinks.forEach((a, index) => {
+               // Clean up the text, Z AI sometimes puts titles and URLs inside the a tag
+               const linkText = a.innerText.replace(/\n/g, ' - ').trim() || a.href;
+               sourcesMarkdown += `\n${index + 1}. [${linkText}](${a.href})`;
+           });
+        }
+      }
+
+      // D. Final Compilation
+      fullMarkdownLog += `### 🤖 **Z AI**\n\n`;
+      
+      if (thinkingMarkdown.trim()) {
+         const indentedThinking = thinkingMarkdown.trim().split('\n').map(line => `> ${line}`).join('\n');
+         fullMarkdownLog += `> [!quote]- 🧠 **Model Thinking**\n${indentedThinking}\n\n`;
+      }
+      
+      if (mainResponseMarkdown.trim()) {
+         fullMarkdownLog += `${mainResponseMarkdown.trim()}\n\n`;
+      }
+
+      if (sourcesMarkdown.trim()) {
+         fullMarkdownLog += `${sourcesMarkdown.trim()}\n\n`;
+      }
+      
+      fullMarkdownLog += `---\n\n`;
+    }
+  }
+
+  return fullMarkdownLog;
+}
+

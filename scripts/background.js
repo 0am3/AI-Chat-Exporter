@@ -10,6 +10,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       target = "chatgpt";
     } else if (request.url.includes("claude.ai")) {
       target = "claude";
+    } else if (request.url.includes("chat.z.ai")) {
+      target = "zai";
     }
 
     if (!target) {

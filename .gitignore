@@ -6,8 +6,7 @@ Thumbs.db
 *.zip
 *.crx
 *.pem
-*.md
-!README.md
+export-samples/*
 
 # IDE / Editor
 .vscode/

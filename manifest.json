@@ -19,7 +19,8 @@
         "matches": [
             "*://chatgpt.com/*", 
             "*://claude.ai/*", 
-            "*://gemini.google.com/*"
+            "*://gemini.google.com/*",
+            "*://chat.z.ai/*"
         ],
         "js": ["scripts/turndown.js", "scripts/content.js"]
         }
